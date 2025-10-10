@@ -5,6 +5,7 @@ A Thunderbird extension that adds a context menu option to quickly open online m
 ## Features
 
 - Adds "Open Meeting Link" option to calendar event context menu
+- Automatically enables/disables menu item based on link presence
 - Supports Microsoft Teams meeting links
 - Supports Google Meet links
 - Works in various calendar views (day, week, month)
@@ -41,22 +42,23 @@ A Thunderbird extension that adds a context menu option to quickly open online m
 
 2. **Open the Meeting Link**:
    - Right-click on the calendar event
+   - The "Open Meeting Link" menu item will be enabled if a meeting link is found
    - Select "Open Meeting Link" from the context menu
    - The meeting link will open in your default browser
 
-3. **If No Link is Found**:
-   - You'll see a message "No meeting link found in this event"
-   - This means either:
-     - The event doesn't contain a meeting link
-     - The meeting link format isn't supported
-     - The event isn't a meeting
+3. **Smart Menu Behavior**:
+   - The "Open Meeting Link" menu item is automatically enabled/disabled
+   - Enabled: When the right-clicked event contains a supported meeting link
+   - Disabled: When no meeting link is found
+   - If you try to open a disabled link, you'll see a message explaining why
 
 ## Tips
 
-- Make sure to click directly on the calendar event, not the empty space around it
-- The event must be selected for the context menu option to work
+- The menu item is automatically enabled/disabled based on the right-clicked event
+- You can right-click any event to check if it has a meeting link
 - Links must be in the event description to be detected
 - If a meeting has multiple links, the Teams link will be preferred over Meet
+- Works in all calendar views (day, week, month, multiweek)
 
 ## Installation
 
@@ -77,9 +79,9 @@ A Thunderbird extension that adds a context menu option to quickly open online m
 ## Known Issues
 
 - May not detect some specially formatted meeting links
-- Some calendar views might require clicking the event first
 - Meeting links in attachments are not detected
 - Links in recurring events work the same as regular events
+- Menu item state updates only on right-click or selection change
 
 ## Privacy
 
@@ -91,11 +93,11 @@ This extension:
 
 ## Troubleshooting
 
-If the "Open Meeting Link" option doesn't appear:
+If the "Open Meeting Link" option is always disabled:
 1. Make sure you're right-clicking directly on a calendar event
-2. Try selecting the event first, then right-clicking
-3. Check if the event actually contains a meeting link
-4. Restart Thunderbird
+2. Check if the event actually contains a meeting link
+3. Try viewing the event details to verify the link is in the description
+4. Restart Thunderbird if the menu seems stuck
 
 If the link doesn't open:
 1. Check if your default browser is properly configured

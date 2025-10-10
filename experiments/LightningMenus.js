@@ -2,6 +2,8 @@
  * Meeting Opener Extension for Thunderbird
  * This extension adds a context menu item to calendar events that allows users to
  * quickly open meeting links (Teams, Meet) found in the event description.
+ * The menu item is dynamically enabled/disabled based on whether the right-clicked
+ * event contains a supported meeting link.
  */
 
 "use strict";
@@ -80,6 +82,189 @@ this.LightningMenus = class extends ExtensionCommon.ExtensionAPI {
     }
 
     return "";
+  }
+
+  /**
+   * Checks if the given event description contains any supported meeting link
+   * (Teams or Google Meet)
+   * 
+   * @param {string} description - The calendar event description text
+   * @returns {boolean} True if the description contains a supported meeting link
+   */
+  hasMeetingLink(description) {
+    if (!description) {
+      return false;
+    }
+    
+    // Try Teams first
+    const teamsUrl = this.getTeamsMeetingUrl(description);
+    if (teamsUrl) {
+      return true;
+    }
+    
+    // Then try Google Meet
+    const meetUrl = this.getMeetMeetingUrl(description);
+    return !!meetUrl;
+  }
+
+  /**
+   * Gets the selected calendar event from the window
+   * This extracts the event object using the same logic as the click handler
+   * 
+   * @param {Window} window - The window to check for selected event
+   * @returns {Object} The selected calendar event object or null if none found
+   */
+  getSelectedEvent(window) {
+    console.log("WebExtensions: Getting selected event from window");
+    try {
+      // Get the main calendar window
+      var mainWindow = window.document.getElementById("messengerWindow");
+      if (!mainWindow) {
+        console.log("WebExtensions: Could not find messenger window");
+        return null;
+      }
+
+      // Get the calendar tab panel
+      var tabpanels = mainWindow.querySelector("#tabpanelcontainer");
+      if (!tabpanels) {
+        console.log("WebExtensions: Could not find tab panels");
+        return null;
+      }
+
+      // Get the selected panel
+      var selectedPanel = tabpanels.querySelector("[selected='true']");
+      if (!selectedPanel) {
+        console.log("WebExtensions: Could not find selected panel");
+        return null;
+      }
+
+      console.log("WebExtensions: Found selected panel:", selectedPanel.id);
+
+      var calEvent = null;
+
+      // Try multiweek view first as it's most reliable
+      var multiWeekView = window.document.querySelector("calendar-multiweek-view");
+      if (multiWeekView) {
+        console.log("WebExtensions: Found multiweek view");
+        try {
+          if (multiWeekView.selectedItem) {
+            calEvent = multiWeekView.selectedItem;
+            console.log("WebExtensions: Found event via multiweek view selectedItem");
+            console.log("WebExtensions: Event type:", calEvent.constructor.name);
+          } else if (multiWeekView.getSelectedItems) {
+            var items = multiWeekView.getSelectedItems({});
+            console.log("WebExtensions: getSelectedItems returned", items ? items.length : 0, "items");
+            if (items && items.length > 0) {
+              calEvent = items[0];
+              console.log("WebExtensions: Found event via getSelectedItems");
+              console.log("WebExtensions: Event type:", calEvent.constructor.name);
+            }
+          }
+        } catch (e) {
+          console.error("WebExtensions: Error accessing multiweek view:", e);
+          console.error(e);
+        }
+      }
+
+      // If no event found, try week view
+      if (!calEvent) {
+        console.log("WebExtensions: Searching week view for selected items");
+        var weekView = window.document.querySelector(".calendar-week-view");
+        if (weekView) {
+          console.log("WebExtensions: Found week view");
+          var selectedItems = weekView.querySelectorAll("[selected='true']");
+          console.log("WebExtensions: Selected items found:", selectedItems.length);
+          
+          selectedItems.forEach((item, index) => {
+            console.log("WebExtensions: Checking selected item", index);
+            console.log("WebExtensions: Item properties:", 
+              Object.getOwnPropertyNames(item).join(", "));
+            if (item.occurrence && !calEvent) {
+              calEvent = item.occurrence;
+              console.log("WebExtensions: Found event via selected item occurrence");
+              console.log("WebExtensions: Event type:", calEvent.constructor.name);
+            } else if (item.item && !calEvent) {
+              calEvent = item.item;
+              console.log("WebExtensions: Found event via selected item.item");
+              console.log("WebExtensions: Event type:", calEvent.constructor.name);
+            }
+          });
+        }
+      }
+
+      return calEvent;
+    } catch (err) {
+      console.error("Error getting selected event:", err);
+      return null;
+    }
+  }
+
+  /**
+   * Gets the description from a calendar event
+   * Tries multiple methods to extract the description
+   * 
+   * @param {Object} calEvent - The calendar event object
+   * @returns {string} The event description or empty string if none found
+   */
+  getEventDescription(calEvent) {
+    console.log("WebExtensions: Getting description for event:", calEvent);
+    
+    if (!calEvent) {
+      console.log("WebExtensions: No calendar event provided");
+      return "";
+    }
+
+    try {
+      // Log available properties on the event
+      console.log("WebExtensions: Event properties available:", 
+        Object.getOwnPropertyNames(calEvent).join(", "));
+
+      // Try multiple methods to get the description
+      let description = "";
+      
+      if (calEvent.getProperty) {
+        console.log("WebExtensions: Trying getProperty method");
+        description = calEvent.getProperty("DESCRIPTION");
+        console.log("WebExtensions: getProperty result:", description);
+      }
+      
+      if (!description && calEvent.description) {
+        console.log("WebExtensions: Trying description property");
+        description = calEvent.description;
+        console.log("WebExtensions: description property result:", description);
+      }
+      
+      if (!description && calEvent.event) {
+        console.log("WebExtensions: Trying event object");
+        if (calEvent.event.getProperty) {
+          description = calEvent.event.getProperty("DESCRIPTION");
+          console.log("WebExtensions: event.getProperty result:", description);
+        }
+        if (!description && calEvent.event.description) {
+          description = calEvent.event.description;
+          console.log("WebExtensions: event.description result:", description);
+        }
+      }
+
+      // Try additional potential properties
+      if (!description && calEvent.item) {
+        console.log("WebExtensions: Trying item property");
+        if (calEvent.item.getProperty) {
+          description = calEvent.item.getProperty("DESCRIPTION");
+          console.log("WebExtensions: item.getProperty result:", description);
+        }
+        if (!description && calEvent.item.description) {
+          description = calEvent.item.description;
+          console.log("WebExtensions: item.description result:", description);
+        }
+      }
+      
+      console.log("WebExtensions: Final description:", description || "(empty string)");
+      return description || "";
+    } catch (e) {
+      console.error("WebExtensions: Error getting description:", e);
+      return "";
+    }
   }
 
   /**
@@ -371,7 +556,57 @@ this.LightningMenus = class extends ExtensionCommon.ExtensionAPI {
                   var menuItem = window.document.createXULElement("menuitem");
                   menuItem.setAttribute("id", "calendar-meeting-opener-menuitem");
                   menuItem.setAttribute("label", "Open Meeting Link");
+                  menuItem.setAttribute("disabled", "true"); // Disabled by default
                   menuItem.addEventListener("command", handleMenuClick);
+
+                  // Function to update menu item state based on selection
+                  function updateMenuItemState(event) {
+                    console.log("WebExtensions: Updating menu item state");
+                    
+                    let calEvent = null;
+                    
+                    // If this is a context menu event, use the trigger node
+                    if (event && event.type === "popupshowing") {
+                      const contextMenu = event.target;
+                      const triggerNode = contextMenu.triggerNode;
+                      
+                      if (triggerNode) {
+                        console.log("WebExtensions: Context menu triggered on:", triggerNode.tagName);
+                        
+                        // Walk up from trigger node to find event
+                        let currentElement = triggerNode;
+                        for (let i = 0; i < 5 && currentElement && !calEvent; i++) {
+                          if (currentElement.occurrence) {
+                            calEvent = currentElement.occurrence;
+                          } else if (currentElement.item) {
+                            calEvent = currentElement.item;
+                          } else if (currentElement.event) {
+                            calEvent = currentElement.event;
+                          }
+                          currentElement = currentElement.parentNode;
+                        }
+                      }
+                    }
+                    
+                    // If we didn't find an event from the context menu, try selected event
+                    if (!calEvent) {
+                      calEvent = self.getSelectedEvent(window);
+                    }
+                    
+                    if (calEvent) {
+                      console.log("WebExtensions: Found calendar event");
+                      const description = self.getEventDescription(calEvent);
+                      console.log("WebExtensions: Description length:", description ? description.length : 0);
+                      
+                      const hasLink = self.hasMeetingLink(description);
+                      console.log("WebExtensions: Has meeting link:", hasLink);
+                      
+                      menuItem.setAttribute("disabled", !hasLink);
+                    } else {
+                      console.log("WebExtensions: No calendar event found, disabling menu item");
+                      menuItem.setAttribute("disabled", "true");
+                    }
+                  }
                   
                   // Find the calendar context menu
                   var contextMenu = window.document.getElementById("calendar-item-context-menu");
@@ -385,6 +620,30 @@ this.LightningMenus = class extends ExtensionCommon.ExtensionAPI {
                     // Add menu item
                     contextMenu.appendChild(menuItem);
                     console.log("Menu item added successfully");
+
+                    // Update state when context menu is about to show
+                    contextMenu.addEventListener("popupshowing", updateMenuItemState);
+
+                    // Set up selection change listeners on calendar views
+                    const setupViewListeners = (view) => {
+                      if (!view) return;
+                      
+                      // The selection change events we want to listen for
+                      const events = ["select", "dayselect", "itemselect"];
+                      
+                      events.forEach(eventName => {
+                        view.addEventListener(eventName, updateMenuItemState);
+                      });
+                      
+                      console.log("Selection listeners added to view:", view.tagName);
+                    };
+
+                    // Add listeners to both week and multiweek views
+                    const weekView = window.document.querySelector(".calendar-week-view");
+                    const multiWeekView = window.document.querySelector("calendar-multiweek-view");
+                    
+                    setupViewListeners(weekView);
+                    setupViewListeners(multiWeekView);
                   } else {
                     console.error("Could not find calendar context menu");
                   }
