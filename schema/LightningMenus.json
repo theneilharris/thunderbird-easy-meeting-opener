@@ -1,0 +1,35 @@
+[
+  {
+    "namespace": "LightningMenus",
+    "description": "API for interacting with calendar menus",
+    "types": [],
+    "functions": [
+      {
+        "name": "registerMenus",
+        "type": "function",
+        "description": "Register calendar context menus",
+        "async": true,
+        "parameters": []
+      }
+    ],
+    "events": [
+      {
+        "name": "onCalendarItemClick",
+        "type": "function",
+        "description": "Fired when a calendar item is clicked",
+        "parameters": [
+          {
+            "type": "object",
+            "name": "info",
+            "properties": {
+              "title": { "type": "string" },
+              "startDate": { "type": "string" },
+              "endDate": { "type": "string" },
+              "description": { "type": "string" }
+            }
+          }
+        ]
+      }
+    ]
+  }
+]
