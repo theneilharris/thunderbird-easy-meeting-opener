@@ -7,6 +7,7 @@ A Thunderbird extension that adds a context menu option to quickly open online m
 - Adds "Open Meeting Link" option to calendar event context menu
 - Automatically enables/disables menu item based on link presence
 - Supports Microsoft Teams meeting links
+- Supports Zoom meeting links
 - Supports Google Meet links
 - Works in various calendar views (day, week, month)
 - Opens links in your default browser
@@ -19,12 +20,15 @@ A Thunderbird extension that adds a context menu option to quickly open online m
 - Meeting links in HTML format (`<https://teams.live.com/meet/...>`)
 - Meetings with separate ID and Passcode
 
+### Zoom
+- Direct meeting links (`https://zoom.us/j/...`)
+- Supports various Zoom domains (zoom.us, zoom.com, etc.)
+
 ### Google Meet
 - Direct meeting links (`https://meet.google.com/...`)
 
 ## What This Extension Does NOT Do
 
-- Does NOT handle Zoom meetings (yet)
 - Does NOT handle WebEx meetings (yet)
 - Does NOT automatically join meetings
 - Does NOT handle phone numbers or dial-in information
@@ -57,7 +61,7 @@ A Thunderbird extension that adds a context menu option to quickly open online m
 - The menu item is automatically enabled/disabled based on the right-clicked event
 - You can right-click any event to check if it has a meeting link
 - Links must be in the event description to be detected
-- If a meeting has multiple links, the Teams link will be preferred over Meet
+- If a meeting has multiple links, the order of preference is: Teams, Zoom, then Meet
 - Works in all calendar views (day, week, month, multiweek)
 
 ## Installation

@@ -85,6 +85,25 @@ this.LightningMenus = class extends ExtensionCommon.ExtensionAPI {
   }
 
   /**
+   * Extracts Zoom meeting URL from event description
+   * Handles Zoom URLs in various formats from different Zoom domains
+   * 
+   * @param {string} description - The calendar event description text
+   * @returns {string} The Zoom meeting URL or empty string if none found
+   */
+  getZoomMeetingUrl(description) {
+    var urlRegex = /(https:\/\/[\w.-]*zoom.us\/j\/[^\s>]+)/;
+
+    var match = description.match(urlRegex);
+    if (match && match[0]) {
+      console.log("Found Zoom URL:", match[0]);
+      return match[0];
+    }
+
+    return "";
+  }
+
+  /**
    * Checks if the given event description contains any supported meeting link
    * (Teams or Google Meet)
    * 
@@ -101,7 +120,13 @@ this.LightningMenus = class extends ExtensionCommon.ExtensionAPI {
     if (teamsUrl) {
       return true;
     }
-    
+
+    // Then try Zoom
+    const zoomUrl = this.getZoomMeetingUrl(description);
+    if (zoomUrl) {
+      return true;
+    }
+
     // Then try Google Meet
     const meetUrl = this.getMeetMeetingUrl(description);
     return !!meetUrl;
@@ -488,6 +513,10 @@ this.LightningMenus = class extends ExtensionCommon.ExtensionAPI {
                   // Look for meeting URLs in the description
                   // Try Teams first, then Google Meet
                   var url = self.getTeamsMeetingUrl(description);
+
+                  if (!url) {
+                    url = self.getZoomMeetingUrl(description);
+                  }
 
                   if (!url) {
                     url = self.getMeetMeetingUrl(description);
