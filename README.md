@@ -18,7 +18,6 @@ A Thunderbird extension that adds a context menu option to quickly open online m
 ### Microsoft Teams
 - Direct meeting links (`https://teams.live.com/meet/...`)
 - Meeting links in HTML format (`<https://teams.live.com/meet/...>`)
-- Meetings with separate ID and Passcode
 
 ### Zoom
 - Direct meeting links (`https://zoom.us/j/...`)
