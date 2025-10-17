@@ -49,18 +49,6 @@ this.LightningMenus = class extends ExtensionCommon.ExtensionAPI {
       return match[0];
     }
 
-    // Third try: Try to construct from Meeting ID and Passcode
-    // Some meeting invites provide ID and passcode separately
-    var meetingIdMatch = description.match(/Meeting ID:\s*([\d\s]+)/);
-    var passcodeMatch = description.match(/Passcode:\s*([^\s\n]+)/);
-    
-    if (meetingIdMatch && passcodeMatch) {
-      var meetingId = meetingIdMatch[1].replace(/\s+/g, '');
-      var passcode = passcodeMatch[1];
-      console.log("Constructed Teams URL from ID:", meetingId, "and passcode:", passcode);
-      return `https://teams.live.com/meet/${meetingId}?p=${passcode}`;
-    }
-
     console.log("No Teams URL found in description");
     return "";
   }
