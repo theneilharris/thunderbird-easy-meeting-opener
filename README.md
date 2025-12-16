@@ -9,6 +9,7 @@ A Thunderbird extension that adds a context menu option to quickly open online m
 - Supports Microsoft Teams meeting links
 - Supports Zoom meeting links
 - Supports Google Meet links
+- Adds "Email Attendees" option to quickly compose mail to event participants
 - Works in various calendar views (day, week, month)
 - Opens links in your default browser
 - No configuration needed
@@ -48,6 +49,11 @@ A Thunderbird extension that adds a context menu option to quickly open online m
    - The "Open Meeting Link" menu item will be enabled if a meeting link is found
    - Select "Open Meeting Link" from the context menu
    - The meeting link will open in your default browser
+
+   2b. **Email Attendees**:
+      - Right-click on the calendar event
+      - Select "Email Attendees" from the context menu (enabled when attendees are found)
+      - Thunderbird's compose window will open with attendee addresses, subject and body pre-filled
 
 3. **Smart Menu Behavior**:
    - The "Open Meeting Link" menu item is automatically enabled/disabled

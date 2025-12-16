@@ -281,6 +281,81 @@ this.LightningMenus = class extends ExtensionCommon.ExtensionAPI {
   }
 
   /**
+   * Extracts attendee email addresses from a calendar event object
+   * Tries multiple likely properties and falls back to regex extracting from
+   * organizer/attendee strings (e.g. mailto:someone@example.com)
+   *
+   * @param {Object} calEvent - The calendar event object
+   * @returns {Array<string>} Array of email addresses (may be empty)
+   */
+  getEventAttendeeEmails(calEvent) {
+    if (!calEvent) {
+      return [];
+    }
+
+    try {
+      const emails = new Set();
+
+      const extractEmails = (val) => {
+        if (!val) return;
+        try {
+          // If it's an object with an id or email
+          if (typeof val === 'object') {
+            if (val.id) val = val.id;
+            else if (val.email) val = val.email;
+            else val = JSON.stringify(val);
+          }
+        } catch (e) {}
+
+        if (typeof val !== 'string') return;
+        // Common mailto: prefix
+        if (val.startsWith('mailto:')) {
+          val = val.slice(7);
+        }
+
+        // Find all email-like substrings
+        const re = /[A-Z0-9._%+-]+@[A-Z0-9.-]+\.[A-Z]{2,}/ig;
+        const m = val.match(re);
+        if (m) {
+          m.forEach(e => emails.add(e));
+        }
+      };
+
+      // 1) calEvent.attendees array
+      if (calEvent.attendees && Array.isArray(calEvent.attendees)) {
+        calEvent.attendees.forEach(a => extractEmails(a));
+      }
+
+      // 2) calEvent.organizer
+      if (calEvent.organizer) extractEmails(calEvent.organizer);
+
+      // 3) calEvent.item / calEvent.event may contain attendees
+      if (calEvent.item) {
+        try {
+          if (calEvent.item.attendees && Array.isArray(calEvent.item.attendees)) {
+            calEvent.item.attendees.forEach(a => extractEmails(a));
+          }
+          if (calEvent.item.organizer) extractEmails(calEvent.item.organizer);
+        } catch (e) {}
+      }
+
+      if (calEvent.event) {
+        try {
+          if (calEvent.event.attendees && Array.isArray(calEvent.event.attendees)) {
+            calEvent.event.attendees.forEach(a => extractEmails(a));
+          }
+          if (calEvent.event.organizer) extractEmails(calEvent.event.organizer);
+        } catch (e) {}
+      }
+
+      return Array.from(emails);
+    } catch (e) {
+      console.error('WebExtensions: Error extracting attendees:', e);
+      return [];
+    }
+  }
+
+  /**
    * Implements the extension's API
    * This is the main entry point for the extension's functionality
    * 
@@ -539,6 +614,85 @@ this.LightningMenus = class extends ExtensionCommon.ExtensionAPI {
               }
 
               /**
+               * Handles clicks on the "Email Attendees" menu item
+               * Attempts to gather attendee email addresses and opens a mailto: URL
+               * to compose a message to all attendees. Falls back to an alert when
+               * no attendees can be found.
+               *
+               * @param {Event} event - The command event
+               */
+              function handleEmailAttendeesClick(event) {
+                try {
+                  console.log("Email Attendees clicked");
+                  var targetWindow = event.target.ownerGlobal;
+
+                  // Prefer the event the context menu was triggered on
+                  var contextMenu = event.target.parentNode;
+                  var calEvent = null;
+                  if (contextMenu && contextMenu.triggerNode) {
+                    var node = contextMenu.triggerNode;
+                    var current = node;
+                    for (let i = 0; i < 8 && current; i++) {
+                      if (current.occurrence) { calEvent = current.occurrence; break; }
+                      if (current.item) { calEvent = current.item; break; }
+                      if (current.event) { calEvent = current.event; break; }
+                      current = current.parentNode;
+                    }
+                  }
+
+                  // Fallback to selected event if none found from trigger
+                  if (!calEvent) {
+                    calEvent = self.getSelectedEvent(targetWindow);
+                  }
+
+                  if (!calEvent) {
+                    targetWindow.alert("Please select a calendar event with attendees first");
+                    return;
+                  }
+
+                  const emails = self.getEventAttendeeEmails(calEvent) || [];
+                  if (!emails || emails.length === 0) {
+                    targetWindow.alert("No attendee email addresses found for this event");
+                    return;
+                  }
+
+                  // Use Thunderbird's compose service to open a new message to attendees
+                  try {
+                    var msgComposeService = Components.classes["@mozilla.org/messengercompose;1"].getService(Components.interfaces.nsIMsgComposeService);
+                    var params = Components.classes["@mozilla.org/messengercompose/params;1"].createInstance(Components.interfaces.nsIMsgComposeParams);
+                    var composeFields = Components.classes["@mozilla.org/messengercompose/composefields;1"].createInstance(Components.interfaces.nsIMsgCompFields);
+
+                    composeFields.to = emails.join(",");
+                    composeFields.subject = calEvent.title || calEvent.summary || "";
+                    composeFields.body = self.getEventDescription(calEvent) || "";
+
+                    params.composeFields = composeFields;
+                    // Let Thunderbird pick the default identity
+                    params.identity = null;
+                    params.type = Components.interfaces.nsIMsgCompType.New;
+
+                    msgComposeService.OpenComposeWindowWithParams(null, params);
+                  } catch (e) {
+                    console.warn("Compose service unavailable, falling back to mailto:", e);
+
+                    // Fallback: open mailto: URL if compose service isn't available
+                    try {
+                      const to = encodeURIComponent(emails.join(","));
+                      const subject = encodeURIComponent(calEvent.title || calEvent.summary || "Meeting");
+                      const body = encodeURIComponent(self.getEventDescription(calEvent) || "");
+                      const mailto = `mailto:${to}?subject=${subject}&body=${body}`;
+                      targetWindow.open(mailto);
+                    } catch (e2) {
+                      console.error("Error opening mail composer:", e2);
+                      targetWindow.alert("Unable to open mail composer for attendees");
+                    }
+                  }
+                } catch (err) {
+                  console.error("Error handling Email Attendees click:", err);
+                }
+              }
+
+              /**
                * Adds the context menu item to a window
                * Creates and sets up the menu item in the calendar context menu
                * 
@@ -562,34 +716,44 @@ this.LightningMenus = class extends ExtensionCommon.ExtensionAPI {
                     return;
                   }
 
-                  // Remove existing menu item if it exists
-                  // This prevents duplicate items if the extension is reloaded
+                  // Remove existing menu items if they exist (prevents duplicates on reload)
                   var existingItem = window.document.getElementById("calendar-meeting-opener-menuitem");
                   if (existingItem) {
                     existingItem.remove();
                   }
+                  var existingEmailItem = window.document.getElementById("calendar-email-attendees-menuitem");
+                  if (existingEmailItem) {
+                    existingEmailItem.remove();
+                  }
 
-                  // Create menu item
+                  // Create menu item for opening meeting links
                   var menuItem = window.document.createXULElement("menuitem");
                   menuItem.setAttribute("id", "calendar-meeting-opener-menuitem");
                   menuItem.setAttribute("label", "Open Meeting Link");
                   menuItem.setAttribute("disabled", "true"); // Disabled by default
                   menuItem.addEventListener("command", handleMenuClick);
 
-                  // Function to update menu item state based on selection
+                  // Create menu item for emailing attendees
+                  var emailMenuItem = window.document.createXULElement("menuitem");
+                  emailMenuItem.setAttribute("id", "calendar-email-attendees-menuitem");
+                  emailMenuItem.setAttribute("label", "Email Attendees");
+                  emailMenuItem.setAttribute("disabled", "true"); // Disabled by default
+                  emailMenuItem.addEventListener("command", handleEmailAttendeesClick);
+
+                  // Function to update menu item state based on selection/trigger
                   function updateMenuItemState(event) {
                     console.log("WebExtensions: Updating menu item state");
-                    
+
                     let calEvent = null;
-                    
+
                     // If this is a context menu event, use the trigger node
                     if (event && event.type === "popupshowing") {
                       const contextMenu = event.target;
                       const triggerNode = contextMenu.triggerNode;
-                      
+
                       if (triggerNode) {
                         console.log("WebExtensions: Context menu triggered on:", triggerNode.tagName);
-                        
+
                         // Walk up from trigger node to find event
                         let currentElement = triggerNode;
                         for (let i = 0; i < 5 && currentElement && !calEvent; i++) {
@@ -604,24 +768,30 @@ this.LightningMenus = class extends ExtensionCommon.ExtensionAPI {
                         }
                       }
                     }
-                    
+
                     // If we didn't find an event from the context menu, try selected event
                     if (!calEvent) {
                       calEvent = self.getSelectedEvent(window);
                     }
-                    
+
                     if (calEvent) {
                       console.log("WebExtensions: Found calendar event");
                       const description = self.getEventDescription(calEvent);
                       console.log("WebExtensions: Description length:", description ? description.length : 0);
-                      
+
                       const hasLink = self.hasMeetingLink(description);
                       console.log("WebExtensions: Has meeting link:", hasLink);
-                      
+
+                      // Determine attendee list for email menu
+                      const attendeeEmails = self.getEventAttendeeEmails(calEvent) || [];
+                      console.log("WebExtensions: Attendee emails:", attendeeEmails);
+
                       menuItem.setAttribute("disabled", !hasLink);
+                      emailMenuItem.setAttribute("disabled", attendeeEmails.length === 0);
                     } else {
-                      console.log("WebExtensions: No calendar event found, disabling menu item");
+                      console.log("WebExtensions: No calendar event found, disabling menu items");
                       menuItem.setAttribute("disabled", "true");
+                      emailMenuItem.setAttribute("disabled", "true");
                     }
                   }
                   
@@ -634,9 +804,10 @@ this.LightningMenus = class extends ExtensionCommon.ExtensionAPI {
                     var separator = window.document.createXULElement("menuseparator");
                     contextMenu.appendChild(separator);
                     
-                    // Add menu item
+                    // Add menu items (meeting link first, email attendees second)
                     contextMenu.appendChild(menuItem);
-                    console.log("Menu item added successfully");
+                    contextMenu.appendChild(emailMenuItem);
+                    console.log("Menu items added successfully");
 
                     // Update state when context menu is about to show
                     contextMenu.addEventListener("popupshowing", updateMenuItemState);
