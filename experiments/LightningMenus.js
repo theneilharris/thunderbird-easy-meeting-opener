@@ -10,7 +10,7 @@
 
 // Import the common extension utilities from Thunderbird
 var { ExtensionCommon } = ChromeUtils.importESModule(
-  "resource://gre/modules/ExtensionCommon.sys.mjs"
+  "resource://gre/modules/ExtensionCommon.sys.mjs",
 );
 
 /**
@@ -24,29 +24,54 @@ this.LightningMenus = class extends ExtensionCommon.ExtensionAPI {
    * 1. URLs in angle brackets <https://teams.live.com/...>
    * 2. Plain URLs https://teams.live.com/...
    * 3. Meeting ID and Passcode format
-   * 
+   *
    * @param {string} description - The calendar event description text
    * @returns {string} The Teams meeting URL or empty string if none found
    */
   getTeamsMeetingUrl(description) {
-    // First try: Look for the URL between < and >
+    // First try: Look for teams.microsoft.com URLs between < and >
     // This format is common in HTML-formatted event descriptions
-    var bracketUrlRegex = /<(https:\/\/teams\.live\.com\/meet\/[^>]+)>/;
-    var bracketMatch = description.match(bracketUrlRegex);
-    
-    if (bracketMatch && bracketMatch[1]) {
-      console.log("Found Teams URL in brackets:", bracketMatch[1]);
-      return bracketMatch[1];
+    var bracketMsRegex =
+      /<(https:\/\/teams\.microsoft\.com\/l\/meetup-join\/[^>]+)>/;
+    var bracketMsMatch = description.match(bracketMsRegex);
+
+    if (bracketMsMatch && bracketMsMatch[1]) {
+      console.log(
+        "Found Teams (microsoft.com) URL in brackets:",
+        bracketMsMatch[1],
+      );
+      return bracketMsMatch[1];
     }
 
-    // Second try: Look for any Teams URL
-    // This catches plain text URLs without brackets
-    var urlRegex = /https:\/\/teams\.live\.com\/meet\/[\w\d?=&]+/;
-    var match = description.match(urlRegex);
-    
-    if (match && match[0]) {
-      console.log("Found Teams URL:", match[0]);
-      return match[0];
+    // Second try: Look for teams.live.com URLs between < and >
+    var bracketLiveRegex = /<(https:\/\/teams\.live\.com\/meet\/[^>]+)>/;
+    var bracketLiveMatch = description.match(bracketLiveRegex);
+
+    if (bracketLiveMatch && bracketLiveMatch[1]) {
+      console.log(
+        "Found Teams (live.com) URL in brackets:",
+        bracketLiveMatch[1],
+      );
+      return bracketLiveMatch[1];
+    }
+
+    // Third try: Look for any teams.microsoft.com URL (plain text)
+    var msUrlRegex =
+      /https:\/\/teams\.microsoft\.com\/l\/meetup-join\/[^\s<>]*/;
+    var msMatch = description.match(msUrlRegex);
+
+    if (msMatch && msMatch[0]) {
+      console.log("Found Teams (microsoft.com) URL:", msMatch[0]);
+      return msMatch[0];
+    }
+
+    // Fourth try: Look for any teams.live.com URL (plain text)
+    var liveUrlRegex = /https:\/\/teams\.live\.com\/meet\/[\w\d?=&]+/;
+    var liveMatch = description.match(liveUrlRegex);
+
+    if (liveMatch && liveMatch[0]) {
+      console.log("Found Teams (live.com) URL:", liveMatch[0]);
+      return liveMatch[0];
     }
 
     console.log("No Teams URL found in description");
