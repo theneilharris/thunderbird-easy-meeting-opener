@@ -9,6 +9,7 @@ A Thunderbird extension that adds a context menu option to quickly open online m
 - Supports Microsoft Teams meeting links
 - Supports Zoom meeting links
 - Supports Google Meet links
+- Supports kMeet (Infomaniak) meeting links
 - Adds "Email Attendees" option to quickly compose mail to event participants
 - Works in various calendar views (day, week, month)
 - Opens links in your default browser
@@ -18,6 +19,7 @@ A Thunderbird extension that adds a context menu option to quickly open online m
 
 ### Microsoft Teams
 - Direct meeting links (`https://teams.live.com/meet/...`)
+- Meeting links (`https://teams.microsoft.com/l/meetup-join/...`)
 - Meeting links in HTML format (`<https://teams.live.com/meet/...>`)
 
 ### Zoom
@@ -26,6 +28,12 @@ A Thunderbird extension that adds a context menu option to quickly open online m
 
 ### Google Meet
 - Direct meeting links (`https://meet.google.com/...`)
+
+### kMeet (Infomaniak)
+- Direct meeting links (`https://kmeet.infomaniak.com/...`)
+- Custom domain meeting links (`https://kmeet.my-company.tld/...`)
+- Meeting links in HTML format (`<https://kmeet.infomaniak.com/...>`)
+- Supports any domain starting with `kmeet.`
 
 ## What This Extension Does NOT Do
 
@@ -66,7 +74,7 @@ A Thunderbird extension that adds a context menu option to quickly open online m
 - The menu item is automatically enabled/disabled based on the right-clicked event
 - You can right-click any event to check if it has a meeting link
 - Links must be in the event description to be detected
-- If a meeting has multiple links, the order of preference is: Teams, Zoom, then Meet
+- If a meeting has multiple links, the order of preference is: Teams, Zoom, kMeet, then Google Meet
 - Works in all calendar views (day, week, month, multiweek)
 
 ## Installation
