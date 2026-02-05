@@ -6,7 +6,7 @@ A Thunderbird extension that adds a context menu option to quickly open online m
 
 - Adds "Open Meeting Link" option to calendar event context menu
 - Automatically enables/disables menu item based on link presence
-- **Adds "Join Meeting" button to calendar reminder/alarm popups** 🆕
+- Adds "Join Meeting" button to calendar reminder/alarm popups
 - Supports Microsoft Teams meeting links
 - Supports Zoom meeting links
 - Supports Google Meet links
@@ -49,9 +49,9 @@ A Thunderbird extension that adds a context menu option to quickly open online m
 
 ## How to Use
 
-### Method 1: Join from Reminder Popup (Easiest!) 🆕
+### Method 1: Join from Reminder Popup
 
-1. **When a reminder pops up**:
+ **When a reminder pops up**:
    - A reminder window will appear before your meeting
    - If the event contains a meeting link, a **"Join Meeting"** button will appear
    - Click the "Join Meeting" button to open the meeting in your default browser
@@ -59,11 +59,11 @@ A Thunderbird extension that adds a context menu option to quickly open online m
 
 ### Method 2: Join from Calendar Context Menu
 
-1. **Select a Calendar Event**:
+ **Select a Calendar Event**:
    - Navigate to your calendar in Thunderbird
    - Find the meeting you want to join
 
-2. **Open the Meeting Link**:
+ **Open the Meeting Link**:
    - Right-click on the calendar event
    - The "Open Meeting Link" menu item will be enabled if a meeting link is found
    - Select "Open Meeting Link" from the context menu
@@ -75,7 +75,7 @@ A Thunderbird extension that adds a context menu option to quickly open online m
 - Select "Email Attendees" from the context menu (enabled when attendees are found)
 - Thunderbird's compose window will open with attendee addresses, subject and body pre-filled
 
-3. **Smart Menu Behavior**:
+ **Smart Menu Behavior**:
    - The "Open Meeting Link" menu item is automatically enabled/disabled
    - Enabled: When the right-clicked event contains a supported meeting link
    - Disabled: When no meeting link is found
@@ -148,7 +148,3 @@ Feel free to open issues for:
 - Feature requests
 - Support for additional meeting types
 - Documentation improvements
-
-## License
-
-[Add your chosen license here]
