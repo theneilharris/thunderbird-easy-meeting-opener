@@ -6,6 +6,7 @@ A Thunderbird extension that adds a context menu option to quickly open online m
 
 - Adds "Open Meeting Link" option to calendar event context menu
 - Automatically enables/disables menu item based on link presence
+- **Adds "Join Meeting" button to calendar reminder/alarm popups** 🆕
 - Supports Microsoft Teams meeting links
 - Supports Zoom meeting links
 - Supports Google Meet links
@@ -48,6 +49,16 @@ A Thunderbird extension that adds a context menu option to quickly open online m
 
 ## How to Use
 
+### Method 1: Join from Reminder Popup (Easiest!) 🆕
+
+1. **When a reminder pops up**:
+   - A reminder window will appear before your meeting
+   - If the event contains a meeting link, a **"Join Meeting"** button will appear
+   - Click the "Join Meeting" button to open the meeting in your default browser
+   - You can still snooze or dismiss the reminder as usual
+
+### Method 2: Join from Calendar Context Menu
+
 1. **Select a Calendar Event**:
    - Navigate to your calendar in Thunderbird
    - Find the meeting you want to join
@@ -58,10 +69,11 @@ A Thunderbird extension that adds a context menu option to quickly open online m
    - Select "Open Meeting Link" from the context menu
    - The meeting link will open in your default browser
 
-   2b. **Email Attendees**:
-      - Right-click on the calendar event
-      - Select "Email Attendees" from the context menu (enabled when attendees are found)
-      - Thunderbird's compose window will open with attendee addresses, subject and body pre-filled
+### Email Attendees
+
+- Right-click on any calendar event
+- Select "Email Attendees" from the context menu (enabled when attendees are found)
+- Thunderbird's compose window will open with attendee addresses, subject and body pre-filled
 
 3. **Smart Menu Behavior**:
    - The "Open Meeting Link" menu item is automatically enabled/disabled
@@ -71,11 +83,13 @@ A Thunderbird extension that adds a context menu option to quickly open online m
 
 ## Tips
 
-- The menu item is automatically enabled/disabled based on the right-clicked event
+- **Reminder Button**: The "Join Meeting" button appears automatically in reminder popups when a meeting link is detected
+- The context menu item is automatically enabled/disabled based on the right-clicked event
 - You can right-click any event to check if it has a meeting link
 - Links must be in the event description to be detected
 - If a meeting has multiple links, the order of preference is: Teams, Zoom, kMeet, then Google Meet
 - Works in all calendar views (day, week, month, multiweek)
+- Set up calendar reminders (5-10 minutes before meetings) to get the convenient "Join Meeting" button
 
 ## Installation
 
@@ -110,13 +124,19 @@ This extension:
 
 ## Troubleshooting
 
-If the "Open Meeting Link" option is always disabled:
+### "Join Meeting" button doesn't appear in reminder popup:
+1. Make sure the meeting link is in the event **description** field
+2. Verify the link format is supported (Teams, Zoom, kMeet, or Google Meet)
+3. Check the Error Console (Tools → Developer Tools → Error Console) for messages
+4. The button only appears when a valid meeting link is detected
+
+### "Open Meeting Link" option is always disabled:
 1. Make sure you're right-clicking directly on a calendar event
 2. Check if the event actually contains a meeting link
 3. Try viewing the event details to verify the link is in the description
 4. Restart Thunderbird if the menu seems stuck
 
-If the link doesn't open:
+### Link doesn't open:
 1. Check if your default browser is properly configured
 2. Try copying the meeting link manually to verify it's valid
 3. Check the Error Console (Tools → Developer Tools → Error Console) for error messages
