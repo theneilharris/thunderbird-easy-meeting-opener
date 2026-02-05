@@ -1115,10 +1115,55 @@ this.LightningMenus = class extends ExtensionCommon.ExtensionAPI {
 
               wm.addListener(windowListener);
 
+              // Set up listener for alarm dialog windows
+              var alarmWindowListener = {
+                onOpenWindow: function (xulWindow) {
+                  var domWindow = xulWindow
+                    .QueryInterface(Components.interfaces.nsIInterfaceRequestor)
+                    .getInterface(
+                      Components.interfaces.nsIDOMWindowInternal ||
+                        Components.interfaces.nsIDOMWindow,
+                    );
+                  domWindow.addEventListener("load", function listener() {
+                    domWindow.removeEventListener("load", listener);
+                    if (
+                      domWindow.document.documentElement.getAttribute(
+                        "windowtype",
+                      ) === "Calendar:AlarmWindow"
+                    ) {
+                      console.log(
+                        "Alarm dialog detected, setting up meeting buttons",
+                      );
+                      self.setupAlarmDialog(domWindow);
+                    }
+                  });
+                },
+                onCloseWindow: function () {},
+                onWindowTitleChange: function () {},
+              };
+
+              wm.addListener(alarmWindowListener);
+
+              // Also check for already-open alarm windows
+              var alarmWindows = wm.getEnumerator("Calendar:AlarmWindow");
+              while (alarmWindows.hasMoreElements()) {
+                var alarmWindow = alarmWindows.getNext();
+                if (
+                  alarmWindow &&
+                  alarmWindow.document.readyState === "complete"
+                ) {
+                  console.log(
+                    "Found existing alarm window, setting up meeting buttons",
+                  );
+                  self.setupAlarmDialog(alarmWindow);
+                }
+              }
+
               // Cleanup when extension is disabled or uninstalled
               context.callOnClose({
                 close: function () {
                   wm.removeListener(windowListener);
+                  wm.removeListener(alarmWindowListener);
                 },
               });
 
@@ -1131,5 +1176,139 @@ this.LightningMenus = class extends ExtensionCommon.ExtensionAPI {
         },
       },
     };
+  }
+
+  /**
+   * Sets up the alarm dialog to add "Join Meeting" buttons to alarm widgets
+   * @param {Window} window - The alarm dialog window
+   */
+  setupAlarmDialog(window) {
+    try {
+      const alarmRichlist = window.document.getElementById("alarm-richlist");
+      if (!alarmRichlist) {
+        console.log("Could not find alarm richlist");
+        return;
+      }
+
+      console.log("Setting up alarm dialog with meeting buttons");
+
+      // Process any existing alarm widgets
+      for (const widget of alarmRichlist.children) {
+        if (widget.item && widget.alarm) {
+          this.addMeetingButtonIfNeeded(widget);
+        }
+      }
+
+      // Set up observer to watch for new alarm widgets being added
+      const observer = new window.MutationObserver((mutations) => {
+        mutations.forEach((mutation) => {
+          mutation.addedNodes.forEach((node) => {
+            if (node.item && node.alarm) {
+              console.log(
+                "New alarm widget detected, checking for meeting link",
+              );
+              this.addMeetingButtonIfNeeded(node);
+            }
+          });
+        });
+      });
+
+      observer.observe(alarmRichlist, { childList: true });
+
+      console.log("Alarm dialog setup complete");
+    } catch (e) {
+      console.error("Error setting up alarm dialog:", e);
+    }
+  }
+
+  /**
+   * Checks if an alarm widget's event has a meeting link and adds a button if needed
+   * @param {Element} widget - The alarm widget element
+   */
+  addMeetingButtonIfNeeded(widget) {
+    try {
+      // Check if we already added a button to this widget
+      if (widget.querySelector(".alarm-join-meeting-button")) {
+        console.log("Join meeting button already exists for this widget");
+        return;
+      }
+
+      const description = this.getEventDescription(widget.item);
+      console.log("Checking for meeting link in alarm widget");
+
+      // Try to find a meeting URL in priority order
+      const meetingUrl =
+        this.getTeamsMeetingUrl(description) ||
+        this.getZoomMeetingUrl(description) ||
+        this.getKMeetMeetingUrl(description) ||
+        this.getMeetMeetingUrl(description);
+
+      if (meetingUrl) {
+        console.log("Found meeting URL in alarm:", meetingUrl);
+        this.addJoinMeetingButton(widget, meetingUrl);
+      } else {
+        console.log("No meeting URL found in alarm widget");
+      }
+    } catch (e) {
+      console.error("Error checking alarm widget for meeting link:", e);
+    }
+  }
+
+  /**
+   * Adds a "Join Meeting" button to an alarm widget
+   * @param {Element} widget - The alarm widget element
+   * @param {string} meetingUrl - The meeting URL to open
+   */
+  addJoinMeetingButton(widget, meetingUrl) {
+    try {
+      const actionButtons = widget.querySelector(".alarm-action-buttons");
+      if (!actionButtons) {
+        console.log("Could not find action buttons container");
+        return;
+      }
+
+      const window = widget.ownerDocument.defaultView;
+
+      // Create the Join Meeting button
+      const joinButton = widget.ownerDocument.createXULElement("button");
+      joinButton.setAttribute("label", "Join Meeting");
+      joinButton.setAttribute("class", "alarm-join-meeting-button");
+      joinButton.style.marginBottom = "4px";
+
+      // Add click handler to open the meeting URL
+      joinButton.addEventListener("command", function () {
+        console.log("Join Meeting button clicked, opening:", meetingUrl);
+        try {
+          // Create a nsIURI object for the URL
+          const uri = Components.classes["@mozilla.org/network/io-service;1"]
+            .getService(Components.interfaces.nsIIOService)
+            .newURI(meetingUrl);
+
+          // Get the protocol handler to open URLs
+          const protocolSvc = Components.classes[
+            "@mozilla.org/uriloader/external-protocol-service;1"
+          ].getService(Components.interfaces.nsIExternalProtocolService);
+
+          // Open the URL in the default browser
+          protocolSvc.loadURI(uri);
+        } catch (e) {
+          console.error("Error opening meeting URL:", e);
+          // Fallback method if the protocol service fails
+          window.open(meetingUrl);
+        }
+      });
+
+      // Insert the button before the snooze button
+      const snoozeButton = actionButtons.querySelector(".alarm-snooze-button");
+      if (snoozeButton) {
+        actionButtons.insertBefore(joinButton, snoozeButton);
+      } else {
+        actionButtons.insertBefore(joinButton, actionButtons.firstChild);
+      }
+
+      console.log("Join Meeting button added successfully");
+    } catch (e) {
+      console.error("Error adding Join Meeting button:", e);
+    }
   }
 };
