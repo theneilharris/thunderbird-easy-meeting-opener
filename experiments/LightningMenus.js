@@ -10,7 +10,7 @@
 
 // Import the common extension utilities from Thunderbird
 var { ExtensionCommon } = ChromeUtils.importESModule(
-  "resource://gre/modules/ExtensionCommon.sys.mjs"
+  "resource://gre/modules/ExtensionCommon.sys.mjs",
 );
 
 /**
@@ -24,29 +24,54 @@ this.LightningMenus = class extends ExtensionCommon.ExtensionAPI {
    * 1. URLs in angle brackets <https://teams.live.com/...>
    * 2. Plain URLs https://teams.live.com/...
    * 3. Meeting ID and Passcode format
-   * 
+   *
    * @param {string} description - The calendar event description text
    * @returns {string} The Teams meeting URL or empty string if none found
    */
   getTeamsMeetingUrl(description) {
-    // First try: Look for the URL between < and >
+    // First try: Look for teams.microsoft.com URLs between < and >
     // This format is common in HTML-formatted event descriptions
-    var bracketUrlRegex = /<(https:\/\/teams\.live\.com\/meet\/[^>]+)>/;
-    var bracketMatch = description.match(bracketUrlRegex);
-    
-    if (bracketMatch && bracketMatch[1]) {
-      console.log("Found Teams URL in brackets:", bracketMatch[1]);
-      return bracketMatch[1];
+    var bracketMsRegex =
+      /<(https:\/\/teams\.microsoft\.com\/l\/meetup-join\/[^>]+)>/;
+    var bracketMsMatch = description.match(bracketMsRegex);
+
+    if (bracketMsMatch && bracketMsMatch[1]) {
+      console.log(
+        "Found Teams (microsoft.com) URL in brackets:",
+        bracketMsMatch[1],
+      );
+      return bracketMsMatch[1];
     }
 
-    // Second try: Look for any Teams URL
-    // This catches plain text URLs without brackets
-    var urlRegex = /https:\/\/teams\.live\.com\/meet\/[\w\d?=&]+/;
-    var match = description.match(urlRegex);
-    
-    if (match && match[0]) {
-      console.log("Found Teams URL:", match[0]);
-      return match[0];
+    // Second try: Look for teams.live.com URLs between < and >
+    var bracketLiveRegex = /<(https:\/\/teams\.live\.com\/meet\/[^>]+)>/;
+    var bracketLiveMatch = description.match(bracketLiveRegex);
+
+    if (bracketLiveMatch && bracketLiveMatch[1]) {
+      console.log(
+        "Found Teams (live.com) URL in brackets:",
+        bracketLiveMatch[1],
+      );
+      return bracketLiveMatch[1];
+    }
+
+    // Third try: Look for any teams.microsoft.com URL (plain text)
+    var msUrlRegex =
+      /https:\/\/teams\.microsoft\.com\/l\/meetup-join\/[^\s<>]*/;
+    var msMatch = description.match(msUrlRegex);
+
+    if (msMatch && msMatch[0]) {
+      console.log("Found Teams (microsoft.com) URL:", msMatch[0]);
+      return msMatch[0];
+    }
+
+    // Fourth try: Look for any teams.live.com URL (plain text)
+    var liveUrlRegex = /https:\/\/teams\.live\.com\/meet\/[\w\d?=&]+/;
+    var liveMatch = description.match(liveUrlRegex);
+
+    if (liveMatch && liveMatch[0]) {
+      console.log("Found Teams (live.com) URL:", liveMatch[0]);
+      return liveMatch[0];
     }
 
     console.log("No Teams URL found in description");
@@ -56,7 +81,7 @@ this.LightningMenus = class extends ExtensionCommon.ExtensionAPI {
   /**
    * Extracts Google Meet URL from event description
    * Handles Meet URLs in various formats
-   * 
+   *
    * @param {string} description - The calendar event description text
    * @returns {string} The Google Meet URL or empty string if none found
    */
@@ -75,7 +100,7 @@ this.LightningMenus = class extends ExtensionCommon.ExtensionAPI {
   /**
    * Extracts Zoom meeting URL from event description
    * Handles Zoom URLs in various formats from different Zoom domains
-   * 
+   *
    * @param {string} description - The calendar event description text
    * @returns {string} The Zoom meeting URL or empty string if none found
    */
@@ -92,9 +117,42 @@ this.LightningMenus = class extends ExtensionCommon.ExtensionAPI {
   }
 
   /**
+   * Extracts kMeet meeting URL from event description
+   * Handles kMeet URLs in various formats including custom domains
+   * Supports both kmeet.infomaniak.com and custom domains like kmeet.my-company.tld
+   *
+   * @param {string} description - The calendar event description text
+   * @returns {string} The kMeet meeting URL or empty string if none found
+   */
+  getKMeetMeetingUrl(description) {
+    // First try: Look for kMeet URLs between < and >
+    // Matches any domain starting with kmeet. (e.g., kmeet.infomaniak.com, kmeet.company.tld)
+    var bracketUrlRegex = /<(https:\/\/kmeet\.[a-zA-Z0-9.-]+\/[^>]+)>/;
+    var bracketMatch = description.match(bracketUrlRegex);
+
+    if (bracketMatch && bracketMatch[1]) {
+      console.log("Found kMeet URL in brackets:", bracketMatch[1]);
+      return bracketMatch[1];
+    }
+
+    // Second try: Look for plain kMeet URLs
+    // Matches any domain starting with kmeet. followed by the meeting ID pattern
+    var urlRegex = /https:\/\/kmeet\.[a-zA-Z0-9.-]+\/[\w-]+/;
+    var match = description.match(urlRegex);
+
+    if (match && match[0]) {
+      console.log("Found kMeet URL:", match[0]);
+      return match[0];
+    }
+
+    console.log("No kMeet URL found in description");
+    return "";
+  }
+
+  /**
    * Checks if the given event description contains any supported meeting link
-   * (Teams or Google Meet)
-   * 
+   * (Teams, Zoom, Google Meet, or kMeet)
+   *
    * @param {string} description - The calendar event description text
    * @returns {boolean} True if the description contains a supported meeting link
    */
@@ -102,7 +160,7 @@ this.LightningMenus = class extends ExtensionCommon.ExtensionAPI {
     if (!description) {
       return false;
     }
-    
+
     // Try Teams first
     const teamsUrl = this.getTeamsMeetingUrl(description);
     if (teamsUrl) {
@@ -115,6 +173,12 @@ this.LightningMenus = class extends ExtensionCommon.ExtensionAPI {
       return true;
     }
 
+    // Then try kMeet
+    const kmeetUrl = this.getKMeetMeetingUrl(description);
+    if (kmeetUrl) {
+      return true;
+    }
+
     // Then try Google Meet
     const meetUrl = this.getMeetMeetingUrl(description);
     return !!meetUrl;
@@ -123,7 +187,7 @@ this.LightningMenus = class extends ExtensionCommon.ExtensionAPI {
   /**
    * Gets the selected calendar event from the window
    * This extracts the event object using the same logic as the click handler
-   * 
+   *
    * @param {Window} window - The window to check for selected event
    * @returns {Object} The selected calendar event object or null if none found
    */
@@ -156,21 +220,35 @@ this.LightningMenus = class extends ExtensionCommon.ExtensionAPI {
       var calEvent = null;
 
       // Try multiweek view first as it's most reliable
-      var multiWeekView = window.document.querySelector("calendar-multiweek-view");
+      var multiWeekView = window.document.querySelector(
+        "calendar-multiweek-view",
+      );
       if (multiWeekView) {
         console.log("WebExtensions: Found multiweek view");
         try {
           if (multiWeekView.selectedItem) {
             calEvent = multiWeekView.selectedItem;
-            console.log("WebExtensions: Found event via multiweek view selectedItem");
-            console.log("WebExtensions: Event type:", calEvent.constructor.name);
+            console.log(
+              "WebExtensions: Found event via multiweek view selectedItem",
+            );
+            console.log(
+              "WebExtensions: Event type:",
+              calEvent.constructor.name,
+            );
           } else if (multiWeekView.getSelectedItems) {
             var items = multiWeekView.getSelectedItems({});
-            console.log("WebExtensions: getSelectedItems returned", items ? items.length : 0, "items");
+            console.log(
+              "WebExtensions: getSelectedItems returned",
+              items ? items.length : 0,
+              "items",
+            );
             if (items && items.length > 0) {
               calEvent = items[0];
               console.log("WebExtensions: Found event via getSelectedItems");
-              console.log("WebExtensions: Event type:", calEvent.constructor.name);
+              console.log(
+                "WebExtensions: Event type:",
+                calEvent.constructor.name,
+              );
             }
           }
         } catch (e) {
@@ -186,20 +264,33 @@ this.LightningMenus = class extends ExtensionCommon.ExtensionAPI {
         if (weekView) {
           console.log("WebExtensions: Found week view");
           var selectedItems = weekView.querySelectorAll("[selected='true']");
-          console.log("WebExtensions: Selected items found:", selectedItems.length);
-          
+          console.log(
+            "WebExtensions: Selected items found:",
+            selectedItems.length,
+          );
+
           selectedItems.forEach((item, index) => {
             console.log("WebExtensions: Checking selected item", index);
-            console.log("WebExtensions: Item properties:", 
-              Object.getOwnPropertyNames(item).join(", "));
+            console.log(
+              "WebExtensions: Item properties:",
+              Object.getOwnPropertyNames(item).join(", "),
+            );
             if (item.occurrence && !calEvent) {
               calEvent = item.occurrence;
-              console.log("WebExtensions: Found event via selected item occurrence");
-              console.log("WebExtensions: Event type:", calEvent.constructor.name);
+              console.log(
+                "WebExtensions: Found event via selected item occurrence",
+              );
+              console.log(
+                "WebExtensions: Event type:",
+                calEvent.constructor.name,
+              );
             } else if (item.item && !calEvent) {
               calEvent = item.item;
               console.log("WebExtensions: Found event via selected item.item");
-              console.log("WebExtensions: Event type:", calEvent.constructor.name);
+              console.log(
+                "WebExtensions: Event type:",
+                calEvent.constructor.name,
+              );
             }
           });
         }
@@ -215,13 +306,13 @@ this.LightningMenus = class extends ExtensionCommon.ExtensionAPI {
   /**
    * Gets the description from a calendar event
    * Tries multiple methods to extract the description
-   * 
+   *
    * @param {Object} calEvent - The calendar event object
    * @returns {string} The event description or empty string if none found
    */
   getEventDescription(calEvent) {
     console.log("WebExtensions: Getting description for event:", calEvent);
-    
+
     if (!calEvent) {
       console.log("WebExtensions: No calendar event provided");
       return "";
@@ -229,24 +320,26 @@ this.LightningMenus = class extends ExtensionCommon.ExtensionAPI {
 
     try {
       // Log available properties on the event
-      console.log("WebExtensions: Event properties available:", 
-        Object.getOwnPropertyNames(calEvent).join(", "));
+      console.log(
+        "WebExtensions: Event properties available:",
+        Object.getOwnPropertyNames(calEvent).join(", "),
+      );
 
       // Try multiple methods to get the description
       let description = "";
-      
+
       if (calEvent.getProperty) {
         console.log("WebExtensions: Trying getProperty method");
         description = calEvent.getProperty("DESCRIPTION");
         console.log("WebExtensions: getProperty result:", description);
       }
-      
+
       if (!description && calEvent.description) {
         console.log("WebExtensions: Trying description property");
         description = calEvent.description;
         console.log("WebExtensions: description property result:", description);
       }
-      
+
       if (!description && calEvent.event) {
         console.log("WebExtensions: Trying event object");
         if (calEvent.event.getProperty) {
@@ -271,8 +364,11 @@ this.LightningMenus = class extends ExtensionCommon.ExtensionAPI {
           console.log("WebExtensions: item.description result:", description);
         }
       }
-      
-      console.log("WebExtensions: Final description:", description || "(empty string)");
+
+      console.log(
+        "WebExtensions: Final description:",
+        description || "(empty string)",
+      );
       return description || "";
     } catch (e) {
       console.error("WebExtensions: Error getting description:", e);
@@ -300,30 +396,30 @@ this.LightningMenus = class extends ExtensionCommon.ExtensionAPI {
         if (!val) return;
         try {
           // If it's an object with an id or email
-          if (typeof val === 'object') {
+          if (typeof val === "object") {
             if (val.id) val = val.id;
             else if (val.email) val = val.email;
             else val = JSON.stringify(val);
           }
         } catch (e) {}
 
-        if (typeof val !== 'string') return;
+        if (typeof val !== "string") return;
         // Common mailto: prefix
-        if (val.startsWith('mailto:')) {
+        if (val.startsWith("mailto:")) {
           val = val.slice(7);
         }
 
         // Find all email-like substrings
-        const re = /[A-Z0-9._%+-]+@[A-Z0-9.-]+\.[A-Z]{2,}/ig;
+        const re = /[A-Z0-9._%+-]+@[A-Z0-9.-]+\.[A-Z]{2,}/gi;
         const m = val.match(re);
         if (m) {
-          m.forEach(e => emails.add(e));
+          m.forEach((e) => emails.add(e));
         }
       };
 
       // 1) calEvent.attendees array
       if (calEvent.attendees && Array.isArray(calEvent.attendees)) {
-        calEvent.attendees.forEach(a => extractEmails(a));
+        calEvent.attendees.forEach((a) => extractEmails(a));
       }
 
       // 2) calEvent.organizer
@@ -332,8 +428,11 @@ this.LightningMenus = class extends ExtensionCommon.ExtensionAPI {
       // 3) calEvent.item / calEvent.event may contain attendees
       if (calEvent.item) {
         try {
-          if (calEvent.item.attendees && Array.isArray(calEvent.item.attendees)) {
-            calEvent.item.attendees.forEach(a => extractEmails(a));
+          if (
+            calEvent.item.attendees &&
+            Array.isArray(calEvent.item.attendees)
+          ) {
+            calEvent.item.attendees.forEach((a) => extractEmails(a));
           }
           if (calEvent.item.organizer) extractEmails(calEvent.item.organizer);
         } catch (e) {}
@@ -341,8 +440,11 @@ this.LightningMenus = class extends ExtensionCommon.ExtensionAPI {
 
       if (calEvent.event) {
         try {
-          if (calEvent.event.attendees && Array.isArray(calEvent.event.attendees)) {
-            calEvent.event.attendees.forEach(a => extractEmails(a));
+          if (
+            calEvent.event.attendees &&
+            Array.isArray(calEvent.event.attendees)
+          ) {
+            calEvent.event.attendees.forEach((a) => extractEmails(a));
           }
           if (calEvent.event.organizer) extractEmails(calEvent.event.organizer);
         } catch (e) {}
@@ -350,7 +452,7 @@ this.LightningMenus = class extends ExtensionCommon.ExtensionAPI {
 
       return Array.from(emails);
     } catch (e) {
-      console.error('WebExtensions: Error extracting attendees:', e);
+      console.error("WebExtensions: Error extracting attendees:", e);
       return [];
     }
   }
@@ -358,7 +460,7 @@ this.LightningMenus = class extends ExtensionCommon.ExtensionAPI {
   /**
    * Implements the extension's API
    * This is the main entry point for the extension's functionality
-   * 
+   *
    * @param {object} context - The extension context
    * @returns {object} The API implementation
    */
@@ -370,7 +472,7 @@ this.LightningMenus = class extends ExtensionCommon.ExtensionAPI {
         /**
          * Registers the context menu in calendar windows
          * Sets up menu items and event handlers for both existing and new windows
-         * 
+         *
          * @returns {Promise} Resolves when menu registration is complete
          */
         async registerMenus() {
@@ -379,17 +481,18 @@ this.LightningMenus = class extends ExtensionCommon.ExtensionAPI {
               /**
                * Handles clicks on the context menu item
                * Finds the selected calendar event and extracts meeting URLs
-               * 
+               *
                * @param {Event} event - The click event object
                */
               function handleMenuClick(event) {
                 try {
                   console.log("Menu item clicked");
                   var targetWindow = event.target.ownerGlobal;
-                  
+
                   // Get the main calendar window
                   // The messengerWindow contains all Thunderbird's main UI
-                  var mainWindow = targetWindow.document.getElementById("messengerWindow");
+                  var mainWindow =
+                    targetWindow.document.getElementById("messengerWindow");
                   if (!mainWindow) {
                     console.log("Could not find messenger window");
                     return;
@@ -397,7 +500,8 @@ this.LightningMenus = class extends ExtensionCommon.ExtensionAPI {
 
                   // Get the calendar tab panel
                   // Calendar view is contained within a tab panel
-                  var tabpanels = mainWindow.querySelector("#tabpanelcontainer");
+                  var tabpanels =
+                    mainWindow.querySelector("#tabpanelcontainer");
                   if (!tabpanels) {
                     console.log("Could not find tab panels");
                     return;
@@ -405,7 +509,8 @@ this.LightningMenus = class extends ExtensionCommon.ExtensionAPI {
 
                   // Get the selected panel
                   // This is the currently visible calendar view
-                  var selectedPanel = tabpanels.querySelector("[selected='true']");
+                  var selectedPanel =
+                    tabpanels.querySelector("[selected='true']");
                   if (!selectedPanel) {
                     console.log("Could not find selected panel");
                     return;
@@ -415,7 +520,7 @@ this.LightningMenus = class extends ExtensionCommon.ExtensionAPI {
                   var calEvent = null;
                   try {
                     console.log("Searching for selected event in week view...");
-                    
+
                     // First try: Get the clicked element and traverse up to find event data
                     // The event data might be on a parent element of what was clicked
                     var contextMenu = event.target.parentNode;
@@ -425,69 +530,103 @@ this.LightningMenus = class extends ExtensionCommon.ExtensionAPI {
                       console.log("- Element tag:", clickedElement.tagName);
                       console.log("- Element class:", clickedElement.className);
                       console.log("- Element id:", clickedElement.id);
-                      
+
                       // Walk up the parent chain to find the event container
                       // Calendar event data could be several levels up from the clicked element
                       var currentElement = clickedElement;
                       var maxDepth = 10; // Prevent infinite loops
                       var depth = 0;
-                      
+
                       while (currentElement && depth < maxDepth) {
                         console.log(`Checking element at depth ${depth}:`);
                         console.log("- Tag:", currentElement.tagName);
                         console.log("- Class:", currentElement.className);
-                        console.log("- Has occurrence:", !!currentElement.occurrence);
+                        console.log(
+                          "- Has occurrence:",
+                          !!currentElement.occurrence,
+                        );
                         console.log("- Has item:", !!currentElement.item);
                         console.log("- Has event:", !!currentElement.event);
-                        
+
                         // Try to get the event data from various properties
                         // Different Thunderbird versions might use different property names
                         if (currentElement.occurrence) {
                           calEvent = currentElement.occurrence;
-                          console.log("Found event via occurrence property at depth", depth);
+                          console.log(
+                            "Found event via occurrence property at depth",
+                            depth,
+                          );
                           break;
                         } else if (currentElement.item) {
                           calEvent = currentElement.item;
-                          console.log("Found event via item property at depth", depth);
+                          console.log(
+                            "Found event via item property at depth",
+                            depth,
+                          );
                           break;
                         } else if (currentElement.event) {
                           calEvent = currentElement.event;
-                          console.log("Found event via event property at depth", depth);
+                          console.log(
+                            "Found event via event property at depth",
+                            depth,
+                          );
                           break;
-                        } else if (currentElement.getAttribute && currentElement.hasAttribute("occurrence")) {
+                        } else if (
+                          currentElement.getAttribute &&
+                          currentElement.hasAttribute("occurrence")
+                        ) {
                           try {
-                            calEvent = JSON.parse(currentElement.getAttribute("occurrence"));
-                            console.log("Found event via occurrence attribute at depth", depth);
+                            calEvent = JSON.parse(
+                              currentElement.getAttribute("occurrence"),
+                            );
+                            console.log(
+                              "Found event via occurrence attribute at depth",
+                              depth,
+                            );
                             break;
                           } catch (e) {}
                         }
-                        
+
                         // Try calendar-specific element selectors
                         // Look for elements that match known calendar item classes
-                        if (currentElement.matches && (
-                            currentElement.matches(".calendar-event-box") ||
+                        if (
+                          currentElement.matches &&
+                          (currentElement.matches(".calendar-event-box") ||
                             currentElement.matches(".calendar-item") ||
-                            currentElement.matches("[is='calendar-event-box']") ||
-                            currentElement.matches("[is='calendar-item']"))) {
-                          console.log("Found calendar event container at depth", depth);
-                          if (currentElement.occurrence || currentElement.item || currentElement.event) {
-                            calEvent = currentElement.occurrence || currentElement.item || currentElement.event;
+                            currentElement.matches(
+                              "[is='calendar-event-box']",
+                            ) ||
+                            currentElement.matches("[is='calendar-item']"))
+                        ) {
+                          console.log(
+                            "Found calendar event container at depth",
+                            depth,
+                          );
+                          if (
+                            currentElement.occurrence ||
+                            currentElement.item ||
+                            currentElement.event
+                          ) {
+                            calEvent =
+                              currentElement.occurrence ||
+                              currentElement.item ||
+                              currentElement.event;
                             console.log("Found event via container element");
                             break;
                           }
                         }
-                        
+
                         // Move up to parent for next iteration
                         currentElement = currentElement.parentNode;
                         depth++;
                       }
-                      
+
                       // If we found a calendar event, log its properties for debugging
                       if (calEvent) {
                         console.log("Calendar event properties:");
                         for (var prop in calEvent) {
                           try {
-                            if (typeof calEvent[prop] !== 'function') {
+                            if (typeof calEvent[prop] !== "function") {
                               console.log(`- ${prop}:`, calEvent[prop]);
                             }
                           } catch (e) {}
@@ -499,12 +638,18 @@ this.LightningMenus = class extends ExtensionCommon.ExtensionAPI {
                     // This method works when an event is selected but not right-clicked
                     if (!calEvent) {
                       console.log("Searching week view for selected items");
-                      var weekView = targetWindow.document.querySelector(".calendar-week-view");
+                      var weekView = targetWindow.document.querySelector(
+                        ".calendar-week-view",
+                      );
                       if (weekView) {
                         console.log("Found week view");
-                        var selectedItems = weekView.querySelectorAll("[selected='true']");
-                        console.log("Selected items found:", selectedItems.length);
-                        
+                        var selectedItems =
+                          weekView.querySelectorAll("[selected='true']");
+                        console.log(
+                          "Selected items found:",
+                          selectedItems.length,
+                        );
+
                         selectedItems.forEach((item, index) => {
                           console.log(`Selected item ${index}:`);
                           console.log("- Tag:", item.tagName);
@@ -521,13 +666,17 @@ this.LightningMenus = class extends ExtensionCommon.ExtensionAPI {
                     // Third try: Check the calendar view controller
                     // This uses the calendar's API to get selected items
                     if (!calEvent) {
-                      var multiWeekView = targetWindow.document.querySelector("calendar-multiweek-view");
+                      var multiWeekView = targetWindow.document.querySelector(
+                        "calendar-multiweek-view",
+                      );
                       if (multiWeekView) {
                         console.log("Found multiweek view");
                         try {
                           if (multiWeekView.selectedItem) {
                             calEvent = multiWeekView.selectedItem;
-                            console.log("Found event via multiweek view selectedItem");
+                            console.log(
+                              "Found event via multiweek view selectedItem",
+                            );
                           } else if (multiWeekView.getSelectedItems) {
                             var items = multiWeekView.getSelectedItems({});
                             if (items && items.length > 0) {
@@ -557,19 +706,20 @@ this.LightningMenus = class extends ExtensionCommon.ExtensionAPI {
                     if (calEvent.getProperty) {
                       description = calEvent.getProperty("DESCRIPTION");
                     }
-                    
+
                     if (!description && calEvent.description) {
                       description = calEvent.description;
                     }
-                    
+
                     if (!description && calEvent.event) {
-                      description = calEvent.event.getProperty("DESCRIPTION") ||
-                                  calEvent.event.description;
+                      description =
+                        calEvent.event.getProperty("DESCRIPTION") ||
+                        calEvent.event.description;
                     }
                   } catch (e) {
                     console.error("Error getting description:", e);
                   }
-                  
+
                   description = description || "";
                   console.log("Event description:", description);
 
@@ -582,6 +732,10 @@ this.LightningMenus = class extends ExtensionCommon.ExtensionAPI {
                   }
 
                   if (!url) {
+                    url = self.getKMeetMeetingUrl(description);
+                  }
+
+                  if (!url) {
                     url = self.getMeetMeetingUrl(description);
                   }
 
@@ -589,14 +743,19 @@ this.LightningMenus = class extends ExtensionCommon.ExtensionAPI {
                     console.log("Opening URL:", url);
                     try {
                       // Create a nsIURI object for the URL
-                      var uri = Components.classes["@mozilla.org/network/io-service;1"]
-                               .getService(Components.interfaces.nsIIOService)
-                               .newURI(url);
-                               
+                      var uri = Components.classes[
+                        "@mozilla.org/network/io-service;1"
+                      ]
+                        .getService(Components.interfaces.nsIIOService)
+                        .newURI(url);
+
                       // Get the protocol handler to open URLs
-                      var protocolSvc = Components.classes["@mozilla.org/uriloader/external-protocol-service;1"]
-                                      .getService(Components.interfaces.nsIExternalProtocolService);
-                      
+                      var protocolSvc = Components.classes[
+                        "@mozilla.org/uriloader/external-protocol-service;1"
+                      ].getService(
+                        Components.interfaces.nsIExternalProtocolService,
+                      );
+
                       // Open the URL in the default browser
                       protocolSvc.loadURI(uri);
                     } catch (e) {
@@ -633,9 +792,18 @@ this.LightningMenus = class extends ExtensionCommon.ExtensionAPI {
                     var node = contextMenu.triggerNode;
                     var current = node;
                     for (let i = 0; i < 8 && current; i++) {
-                      if (current.occurrence) { calEvent = current.occurrence; break; }
-                      if (current.item) { calEvent = current.item; break; }
-                      if (current.event) { calEvent = current.event; break; }
+                      if (current.occurrence) {
+                        calEvent = current.occurrence;
+                        break;
+                      }
+                      if (current.item) {
+                        calEvent = current.item;
+                        break;
+                      }
+                      if (current.event) {
+                        calEvent = current.event;
+                        break;
+                      }
                       current = current.parentNode;
                     }
                   }
@@ -646,25 +814,37 @@ this.LightningMenus = class extends ExtensionCommon.ExtensionAPI {
                   }
 
                   if (!calEvent) {
-                    targetWindow.alert("Please select a calendar event with attendees first");
+                    targetWindow.alert(
+                      "Please select a calendar event with attendees first",
+                    );
                     return;
                   }
 
                   const emails = self.getEventAttendeeEmails(calEvent) || [];
                   if (!emails || emails.length === 0) {
-                    targetWindow.alert("No attendee email addresses found for this event");
+                    targetWindow.alert(
+                      "No attendee email addresses found for this event",
+                    );
                     return;
                   }
 
                   // Use Thunderbird's compose service to open a new message to attendees
                   try {
-                    var msgComposeService = Components.classes["@mozilla.org/messengercompose;1"].getService(Components.interfaces.nsIMsgComposeService);
-                    var params = Components.classes["@mozilla.org/messengercompose/params;1"].createInstance(Components.interfaces.nsIMsgComposeParams);
-                    var composeFields = Components.classes["@mozilla.org/messengercompose/composefields;1"].createInstance(Components.interfaces.nsIMsgCompFields);
+                    var msgComposeService = Components.classes[
+                      "@mozilla.org/messengercompose;1"
+                    ].getService(Components.interfaces.nsIMsgComposeService);
+                    var params = Components.classes[
+                      "@mozilla.org/messengercompose/params;1"
+                    ].createInstance(Components.interfaces.nsIMsgComposeParams);
+                    var composeFields = Components.classes[
+                      "@mozilla.org/messengercompose/composefields;1"
+                    ].createInstance(Components.interfaces.nsIMsgCompFields);
 
                     composeFields.to = emails.join(",");
-                    composeFields.subject = calEvent.title || calEvent.summary || "";
-                    composeFields.body = self.getEventDescription(calEvent) || "";
+                    composeFields.subject =
+                      calEvent.title || calEvent.summary || "";
+                    composeFields.body =
+                      self.getEventDescription(calEvent) || "";
 
                     params.composeFields = composeFields;
                     // Let Thunderbird pick the default identity
@@ -673,18 +853,27 @@ this.LightningMenus = class extends ExtensionCommon.ExtensionAPI {
 
                     msgComposeService.OpenComposeWindowWithParams(null, params);
                   } catch (e) {
-                    console.warn("Compose service unavailable, falling back to mailto:", e);
+                    console.warn(
+                      "Compose service unavailable, falling back to mailto:",
+                      e,
+                    );
 
                     // Fallback: open mailto: URL if compose service isn't available
                     try {
                       const to = encodeURIComponent(emails.join(","));
-                      const subject = encodeURIComponent(calEvent.title || calEvent.summary || "Meeting");
-                      const body = encodeURIComponent(self.getEventDescription(calEvent) || "");
+                      const subject = encodeURIComponent(
+                        calEvent.title || calEvent.summary || "Meeting",
+                      );
+                      const body = encodeURIComponent(
+                        self.getEventDescription(calEvent) || "",
+                      );
                       const mailto = `mailto:${to}?subject=${subject}&body=${body}`;
                       targetWindow.open(mailto);
                     } catch (e2) {
                       console.error("Error opening mail composer:", e2);
-                      targetWindow.alert("Unable to open mail composer for attendees");
+                      targetWindow.alert(
+                        "Unable to open mail composer for attendees",
+                      );
                     }
                   }
                 } catch (err) {
@@ -695,13 +884,13 @@ this.LightningMenus = class extends ExtensionCommon.ExtensionAPI {
               /**
                * Adds the context menu item to a window
                * Creates and sets up the menu item in the calendar context menu
-               * 
+               *
                * @param {Window} window - The window to add the menu to
                */
               function addMenuToWindow(window) {
                 try {
                   console.log("Adding menu to window...");
-                  
+
                   if (!window || !window.document) {
                     console.error("Invalid window object");
                     return;
@@ -710,35 +899,49 @@ this.LightningMenus = class extends ExtensionCommon.ExtensionAPI {
                   // Wait for the document to be fully loaded
                   // Some windows might not be ready when we try to add the menu
                   if (window.document.readyState !== "complete") {
-                    window.addEventListener("load", function() {
+                    window.addEventListener("load", function () {
                       addMenuToWindow(window);
                     });
                     return;
                   }
 
                   // Remove existing menu items if they exist (prevents duplicates on reload)
-                  var existingItem = window.document.getElementById("calendar-meeting-opener-menuitem");
+                  var existingItem = window.document.getElementById(
+                    "calendar-meeting-opener-menuitem",
+                  );
                   if (existingItem) {
                     existingItem.remove();
                   }
-                  var existingEmailItem = window.document.getElementById("calendar-email-attendees-menuitem");
+                  var existingEmailItem = window.document.getElementById(
+                    "calendar-email-attendees-menuitem",
+                  );
                   if (existingEmailItem) {
                     existingEmailItem.remove();
                   }
 
                   // Create menu item for opening meeting links
                   var menuItem = window.document.createXULElement("menuitem");
-                  menuItem.setAttribute("id", "calendar-meeting-opener-menuitem");
+                  menuItem.setAttribute(
+                    "id",
+                    "calendar-meeting-opener-menuitem",
+                  );
                   menuItem.setAttribute("label", "Open Meeting Link");
                   menuItem.setAttribute("disabled", "true"); // Disabled by default
                   menuItem.addEventListener("command", handleMenuClick);
 
                   // Create menu item for emailing attendees
-                  var emailMenuItem = window.document.createXULElement("menuitem");
-                  emailMenuItem.setAttribute("id", "calendar-email-attendees-menuitem");
+                  var emailMenuItem =
+                    window.document.createXULElement("menuitem");
+                  emailMenuItem.setAttribute(
+                    "id",
+                    "calendar-email-attendees-menuitem",
+                  );
                   emailMenuItem.setAttribute("label", "Email Attendees");
                   emailMenuItem.setAttribute("disabled", "true"); // Disabled by default
-                  emailMenuItem.addEventListener("command", handleEmailAttendeesClick);
+                  emailMenuItem.addEventListener(
+                    "command",
+                    handleEmailAttendeesClick,
+                  );
 
                   // Function to update menu item state based on selection/trigger
                   function updateMenuItemState(event) {
@@ -752,11 +955,18 @@ this.LightningMenus = class extends ExtensionCommon.ExtensionAPI {
                       const triggerNode = contextMenu.triggerNode;
 
                       if (triggerNode) {
-                        console.log("WebExtensions: Context menu triggered on:", triggerNode.tagName);
+                        console.log(
+                          "WebExtensions: Context menu triggered on:",
+                          triggerNode.tagName,
+                        );
 
                         // Walk up from trigger node to find event
                         let currentElement = triggerNode;
-                        for (let i = 0; i < 5 && currentElement && !calEvent; i++) {
+                        for (
+                          let i = 0;
+                          i < 5 && currentElement && !calEvent;
+                          i++
+                        ) {
                           if (currentElement.occurrence) {
                             calEvent = currentElement.occurrence;
                           } else if (currentElement.item) {
@@ -777,59 +987,84 @@ this.LightningMenus = class extends ExtensionCommon.ExtensionAPI {
                     if (calEvent) {
                       console.log("WebExtensions: Found calendar event");
                       const description = self.getEventDescription(calEvent);
-                      console.log("WebExtensions: Description length:", description ? description.length : 0);
+                      console.log(
+                        "WebExtensions: Description length:",
+                        description ? description.length : 0,
+                      );
 
                       const hasLink = self.hasMeetingLink(description);
                       console.log("WebExtensions: Has meeting link:", hasLink);
 
                       // Determine attendee list for email menu
-                      const attendeeEmails = self.getEventAttendeeEmails(calEvent) || [];
-                      console.log("WebExtensions: Attendee emails:", attendeeEmails);
+                      const attendeeEmails =
+                        self.getEventAttendeeEmails(calEvent) || [];
+                      console.log(
+                        "WebExtensions: Attendee emails:",
+                        attendeeEmails,
+                      );
 
                       menuItem.setAttribute("disabled", !hasLink);
-                      emailMenuItem.setAttribute("disabled", attendeeEmails.length === 0);
+                      emailMenuItem.setAttribute(
+                        "disabled",
+                        attendeeEmails.length === 0,
+                      );
                     } else {
-                      console.log("WebExtensions: No calendar event found, disabling menu items");
+                      console.log(
+                        "WebExtensions: No calendar event found, disabling menu items",
+                      );
                       menuItem.setAttribute("disabled", "true");
                       emailMenuItem.setAttribute("disabled", "true");
                     }
                   }
-                  
+
                   // Find the calendar context menu
-                  var contextMenu = window.document.getElementById("calendar-item-context-menu");
+                  var contextMenu = window.document.getElementById(
+                    "calendar-item-context-menu",
+                  );
                   console.log("Context menu found:", !!contextMenu);
-                  
+
                   if (contextMenu) {
                     // Add separator first for visual separation
-                    var separator = window.document.createXULElement("menuseparator");
+                    var separator =
+                      window.document.createXULElement("menuseparator");
                     contextMenu.appendChild(separator);
-                    
+
                     // Add menu items (meeting link first, email attendees second)
                     contextMenu.appendChild(menuItem);
                     contextMenu.appendChild(emailMenuItem);
                     console.log("Menu items added successfully");
 
                     // Update state when context menu is about to show
-                    contextMenu.addEventListener("popupshowing", updateMenuItemState);
+                    contextMenu.addEventListener(
+                      "popupshowing",
+                      updateMenuItemState,
+                    );
 
                     // Set up selection change listeners on calendar views
                     const setupViewListeners = (view) => {
                       if (!view) return;
-                      
+
                       // The selection change events we want to listen for
                       const events = ["select", "dayselect", "itemselect"];
-                      
-                      events.forEach(eventName => {
+
+                      events.forEach((eventName) => {
                         view.addEventListener(eventName, updateMenuItemState);
                       });
-                      
-                      console.log("Selection listeners added to view:", view.tagName);
+
+                      console.log(
+                        "Selection listeners added to view:",
+                        view.tagName,
+                      );
                     };
 
                     // Add listeners to both week and multiweek views
-                    const weekView = window.document.querySelector(".calendar-week-view");
-                    const multiWeekView = window.document.querySelector("calendar-multiweek-view");
-                    
+                    const weekView = window.document.querySelector(
+                      ".calendar-week-view",
+                    );
+                    const multiWeekView = window.document.querySelector(
+                      "calendar-multiweek-view",
+                    );
+
                     setupViewListeners(weekView);
                     setupViewListeners(multiWeekView);
                   } else {
@@ -842,8 +1077,9 @@ this.LightningMenus = class extends ExtensionCommon.ExtensionAPI {
 
               // Add menu to all existing windows
               // Get the window mediator service to find all open windows
-              var wm = Components.classes["@mozilla.org/appshell/window-mediator;1"]
-                               .getService(Components.interfaces.nsIWindowMediator);
+              var wm = Components.classes[
+                "@mozilla.org/appshell/window-mediator;1"
+              ].getService(Components.interfaces.nsIWindowMediator);
               var windows = wm.getEnumerator("mail:3pane");
               while (windows.hasMoreElements()) {
                 var window = windows.getNext();
@@ -855,29 +1091,80 @@ this.LightningMenus = class extends ExtensionCommon.ExtensionAPI {
               // Set up listener for new windows
               // This ensures the menu is added to any windows opened after extension load
               var windowListener = {
-                onOpenWindow: function(xulWindow) {
-                  var domWindow = xulWindow.QueryInterface(Components.interfaces.nsIInterfaceRequestor)
-                                        .getInterface(Components.interfaces.nsIDOMWindowInternal ||
-                                                    Components.interfaces.nsIDOMWindow);
+                onOpenWindow: function (xulWindow) {
+                  var domWindow = xulWindow
+                    .QueryInterface(Components.interfaces.nsIInterfaceRequestor)
+                    .getInterface(
+                      Components.interfaces.nsIDOMWindowInternal ||
+                        Components.interfaces.nsIDOMWindow,
+                    );
                   domWindow.addEventListener("load", function listener() {
                     domWindow.removeEventListener("load", listener);
-                    if (domWindow.document.documentElement
-                        .getAttribute("windowtype") === "mail:3pane") {
+                    if (
+                      domWindow.document.documentElement.getAttribute(
+                        "windowtype",
+                      ) === "mail:3pane"
+                    ) {
                       addMenuToWindow(domWindow);
                     }
                   });
                 },
-                onCloseWindow: function() {},
-                onWindowTitleChange: function() {}
+                onCloseWindow: function () {},
+                onWindowTitleChange: function () {},
               };
 
               wm.addListener(windowListener);
-              
+
+              // Set up listener for alarm dialog windows
+              var alarmWindowListener = {
+                onOpenWindow: function (xulWindow) {
+                  var domWindow = xulWindow
+                    .QueryInterface(Components.interfaces.nsIInterfaceRequestor)
+                    .getInterface(
+                      Components.interfaces.nsIDOMWindowInternal ||
+                        Components.interfaces.nsIDOMWindow,
+                    );
+                  domWindow.addEventListener("load", function listener() {
+                    domWindow.removeEventListener("load", listener);
+                    if (
+                      domWindow.document.documentElement.getAttribute(
+                        "windowtype",
+                      ) === "Calendar:AlarmWindow"
+                    ) {
+                      console.log(
+                        "Alarm dialog detected, setting up meeting buttons",
+                      );
+                      self.setupAlarmDialog(domWindow);
+                    }
+                  });
+                },
+                onCloseWindow: function () {},
+                onWindowTitleChange: function () {},
+              };
+
+              wm.addListener(alarmWindowListener);
+
+              // Also check for already-open alarm windows
+              var alarmWindows = wm.getEnumerator("Calendar:AlarmWindow");
+              while (alarmWindows.hasMoreElements()) {
+                var alarmWindow = alarmWindows.getNext();
+                if (
+                  alarmWindow &&
+                  alarmWindow.document.readyState === "complete"
+                ) {
+                  console.log(
+                    "Found existing alarm window, setting up meeting buttons",
+                  );
+                  self.setupAlarmDialog(alarmWindow);
+                }
+              }
+
               // Cleanup when extension is disabled or uninstalled
               context.callOnClose({
-                close: function() {
+                close: function () {
                   wm.removeListener(windowListener);
-                }
+                  wm.removeListener(alarmWindowListener);
+                },
               });
 
               resolve();
@@ -886,8 +1173,142 @@ this.LightningMenus = class extends ExtensionCommon.ExtensionAPI {
               reject(err);
             }
           });
+        },
+      },
+    };
+  }
+
+  /**
+   * Sets up the alarm dialog to add "Join Meeting" buttons to alarm widgets
+   * @param {Window} window - The alarm dialog window
+   */
+  setupAlarmDialog(window) {
+    try {
+      const alarmRichlist = window.document.getElementById("alarm-richlist");
+      if (!alarmRichlist) {
+        console.log("Could not find alarm richlist");
+        return;
+      }
+
+      console.log("Setting up alarm dialog with meeting buttons");
+
+      // Process any existing alarm widgets
+      for (const widget of alarmRichlist.children) {
+        if (widget.item && widget.alarm) {
+          this.addMeetingButtonIfNeeded(widget);
         }
       }
-    };
+
+      // Set up observer to watch for new alarm widgets being added
+      const observer = new window.MutationObserver((mutations) => {
+        mutations.forEach((mutation) => {
+          mutation.addedNodes.forEach((node) => {
+            if (node.item && node.alarm) {
+              console.log(
+                "New alarm widget detected, checking for meeting link",
+              );
+              this.addMeetingButtonIfNeeded(node);
+            }
+          });
+        });
+      });
+
+      observer.observe(alarmRichlist, { childList: true });
+
+      console.log("Alarm dialog setup complete");
+    } catch (e) {
+      console.error("Error setting up alarm dialog:", e);
+    }
+  }
+
+  /**
+   * Checks if an alarm widget's event has a meeting link and adds a button if needed
+   * @param {Element} widget - The alarm widget element
+   */
+  addMeetingButtonIfNeeded(widget) {
+    try {
+      // Check if we already added a button to this widget
+      if (widget.querySelector(".alarm-join-meeting-button")) {
+        console.log("Join meeting button already exists for this widget");
+        return;
+      }
+
+      const description = this.getEventDescription(widget.item);
+      console.log("Checking for meeting link in alarm widget");
+
+      // Try to find a meeting URL in priority order
+      const meetingUrl =
+        this.getTeamsMeetingUrl(description) ||
+        this.getZoomMeetingUrl(description) ||
+        this.getKMeetMeetingUrl(description) ||
+        this.getMeetMeetingUrl(description);
+
+      if (meetingUrl) {
+        console.log("Found meeting URL in alarm:", meetingUrl);
+        this.addJoinMeetingButton(widget, meetingUrl);
+      } else {
+        console.log("No meeting URL found in alarm widget");
+      }
+    } catch (e) {
+      console.error("Error checking alarm widget for meeting link:", e);
+    }
+  }
+
+  /**
+   * Adds a "Join Meeting" button to an alarm widget
+   * @param {Element} widget - The alarm widget element
+   * @param {string} meetingUrl - The meeting URL to open
+   */
+  addJoinMeetingButton(widget, meetingUrl) {
+    try {
+      const actionButtons = widget.querySelector(".alarm-action-buttons");
+      if (!actionButtons) {
+        console.log("Could not find action buttons container");
+        return;
+      }
+
+      const window = widget.ownerDocument.defaultView;
+
+      // Create the Join Meeting button
+      const joinButton = widget.ownerDocument.createXULElement("button");
+      joinButton.setAttribute("label", "Join Meeting");
+      joinButton.setAttribute("class", "alarm-join-meeting-button");
+      joinButton.style.marginBottom = "4px";
+
+      // Add click handler to open the meeting URL
+      joinButton.addEventListener("command", function () {
+        console.log("Join Meeting button clicked, opening:", meetingUrl);
+        try {
+          // Create a nsIURI object for the URL
+          const uri = Components.classes["@mozilla.org/network/io-service;1"]
+            .getService(Components.interfaces.nsIIOService)
+            .newURI(meetingUrl);
+
+          // Get the protocol handler to open URLs
+          const protocolSvc = Components.classes[
+            "@mozilla.org/uriloader/external-protocol-service;1"
+          ].getService(Components.interfaces.nsIExternalProtocolService);
+
+          // Open the URL in the default browser
+          protocolSvc.loadURI(uri);
+        } catch (e) {
+          console.error("Error opening meeting URL:", e);
+          // Fallback method if the protocol service fails
+          window.open(meetingUrl);
+        }
+      });
+
+      // Insert the button before the snooze button
+      const snoozeButton = actionButtons.querySelector(".alarm-snooze-button");
+      if (snoozeButton) {
+        actionButtons.insertBefore(joinButton, snoozeButton);
+      } else {
+        actionButtons.insertBefore(joinButton, actionButtons.firstChild);
+      }
+
+      console.log("Join Meeting button added successfully");
+    } catch (e) {
+      console.error("Error adding Join Meeting button:", e);
+    }
   }
 };
